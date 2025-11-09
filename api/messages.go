@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
-	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -71,7 +71,7 @@ func serveJSON(w http.ResponseWriter, r *http.Request) {
 func loadMessages() []Message {
 	var messages []Message
 	
-	data, err := ioutil.ReadFile(messagesFilePath)
+	data, err := os.ReadFile(messagesFilePath)
 	if err != nil {
 		log.Printf("No messages file found or error reading: %v", err)
 		return messages

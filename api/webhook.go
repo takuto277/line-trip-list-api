@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -119,7 +118,7 @@ func saveToFile(message AppMessage) {
 	
 	// 既存のメッセージを読み込む
 	var messages []AppMessage
-	if data, err := ioutil.ReadFile(messagesFile); err == nil {
+	if data, err := os.ReadFile(messagesFile); err == nil {
 		json.Unmarshal(data, &messages)
 	}
 	
@@ -133,7 +132,7 @@ func saveToFile(message AppMessage) {
 		return
 	}
 	
-	if err := ioutil.WriteFile(messagesFile, data, 0644); err != nil {
+	if err := os.WriteFile(messagesFile, data, 0644); err != nil {
 		log.Printf("❌ Error writing messages file: %v", err)
 		return
 	}
