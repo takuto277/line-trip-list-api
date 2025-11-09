@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -21,11 +22,9 @@ type AppMessage struct {
 	UserName  string `json:"user_name"`
 }
 
-// 共有メモリストレージ（本番環境ではデータベースを使用すること）
-var (
-	receivedMessages []AppMessage
-	mu               sync.Mutex
-)
+const messagesFile = "/tmp/line_messages.json"
+
+var mu sync.Mutex
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -110,25 +109,34 @@ func notifyiOSApp(message AppMessage) {
 	messageJSON, _ := json.MarshalIndent(message, "", "  ")
 	log.Printf("📲 Received LINE Message:\n%s", messageJSON)
 	
-	// メモリ内に保存
-	saveToMemory(message)
+	// ファイルに保存
+	saveToFile(message)
 }
 
-func saveToMemory(message AppMessage) {
+func saveToFile(message AppMessage) {
 	mu.Lock()
 	defer mu.Unlock()
 	
-	receivedMessages = append(receivedMessages, message)
-	log.Printf("✅ Message saved to memory. Total messages: %d", len(receivedMessages))
-}
-
-// GetReceivedMessages returns all received messages (used by messages.go)
-func GetReceivedMessages() []AppMessage {
-	mu.Lock()
-	defer mu.Unlock()
+	// 既存のメッセージを読み込む
+	var messages []AppMessage
+	if data, err := ioutil.ReadFile(messagesFile); err == nil {
+		json.Unmarshal(data, &messages)
+	}
 	
-	// コピーを返す
-	messages := make([]AppMessage, len(receivedMessages))
-	copy(messages, receivedMessages)
-	return messages
+	// 新しいメッセージを追加
+	messages = append(messages, message)
+	
+	// ファイルに書き込む
+	data, err := json.MarshalIndent(messages, "", "  ")
+	if err != nil {
+		log.Printf("❌ Error marshaling messages: %v", err)
+		return
+	}
+	
+	if err := ioutil.WriteFile(messagesFile, data, 0644); err != nil {
+		log.Printf("❌ Error writing messages file: %v", err)
+		return
+	}
+	
+	log.Printf("✅ Message saved to file. Total messages: %d", len(messages))
 }

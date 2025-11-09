@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -11,18 +13,14 @@ import (
 
 // Message represents a stored LINE message
 type Message struct {
-	ID        int    `json:"id"`
 	GroupID   string `json:"group_id"`
 	UserID    string `json:"user_id"`
 	Message   string `json:"message"`
 	UserName  string `json:"user_name"`
 	Timestamp int64  `json:"timestamp"`
-	CreatedAt string `json:"created_at"`
 }
 
-// 一時的にメモリ内ストレージ（後でデータベースに置き換え）
-var messages []Message
-var messageID int = 1
+const messagesFilePath = "/tmp/line_messages.json"
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	// CORS設定
@@ -45,30 +43,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "POST":
-		// 新しいメッセージを保存
-		var msg Message
-		if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
-			return
-		}
-
-		// IDと作成日時を設定
-		msg.ID = messageID
-		messageID++
-		msg.CreatedAt = time.Now().Format(time.RFC3339)
-
-		// メッセージを保存
-		messages = append(messages, msg)
-
+		// POSTは使用しない（webhookから直接ファイルに保存される）
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status":  "success", 
-			"message": "Message saved",
-			"data":    msg,
-		})
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{"error": "POST method not supported. Messages are saved via webhook."})
 
 	default:
 		w.Header().Set("Content-Type", "application/json")
@@ -79,12 +57,32 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 func serveJSON(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	
+	messages := loadMessages()
+	
 	response := map[string]interface{}{
 		"messages": messages,
 		"count":    len(messages),
-		"note":     "Note: Messages are stored in memory and will be lost on restart. Use a database for production.",
+		"note":     "Note: Messages are stored in /tmp and may be cleared. Use a database for production.",
 	}
 	json.NewEncoder(w).Encode(response)
+}
+
+func loadMessages() []Message {
+	var messages []Message
+	
+	data, err := ioutil.ReadFile(messagesFilePath)
+	if err != nil {
+		log.Printf("No messages file found or error reading: %v", err)
+		return messages
+	}
+	
+	if err := json.Unmarshal(data, &messages); err != nil {
+		log.Printf("Error unmarshaling messages: %v", err)
+		return messages
+	}
+	
+	return messages
 }
 
 func serveHTML(w http.ResponseWriter, r *http.Request) {
@@ -277,6 +275,8 @@ func serveHTML(w http.ResponseWriter, r *http.Request) {
         </div>
 `
 
+	messages := loadMessages()
+	
 	if len(messages) == 0 {
 		htmlContent += `
         <div class="empty-state">
@@ -301,7 +301,6 @@ func serveHTML(w http.ResponseWriter, r *http.Request) {
             </div>
             <div class="message-text">%s</div>
             <div class="message-meta">
-                <div class="meta-item">🆔 ID: %d</div>
                 <div class="meta-item">👥 Group: %s</div>
             </div>
         </div>`,
@@ -309,7 +308,6 @@ func serveHTML(w http.ResponseWriter, r *http.Request) {
 				html.EscapeString(msg.UserName),
 				timestamp,
 				html.EscapeString(msg.Message),
-				msg.ID,
 				truncate(msg.GroupID, 20))
 		}
 	}
