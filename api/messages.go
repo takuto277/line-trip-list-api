@@ -88,6 +88,9 @@ func loadMessages() []Message {
 func serveHTML(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	
+	// 最初にメッセージを読み込む
+	messages := loadMessages()
+	
 	htmlContent := `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -275,8 +278,6 @@ func serveHTML(w http.ResponseWriter, r *http.Request) {
         </div>
 `
 
-	messages := loadMessages()
-	
 	if len(messages) == 0 {
 		htmlContent += `
         <div class="empty-state">
