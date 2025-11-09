@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"html"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -20,7 +22,43 @@ type Message struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
-const messagesFilePath = "/tmp/line_messages.json"
+const redisMessagesKey = "line_messages"
+
+// Upstash Redis REST API helper for messages
+func redisGet(key string) (interface{}, error) {
+	url := os.Getenv("KV_REST_API_URL")
+	token := os.Getenv("KV_REST_API_TOKEN")
+	
+	if url == "" || token == "" {
+		return nil, fmt.Errorf("redis credentials not set")
+	}
+	
+	reqBody, _ := json.Marshal([]interface{}{"GET", key})
+	
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return nil, err
+	}
+	
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	
+	body, _ := io.ReadAll(resp.Body)
+	
+	var result struct {
+		Result interface{} `json:"result"`
+	}
+	
+	json.Unmarshal(body, &result)
+	return result.Result, nil
+}
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	// CORS設定
@@ -71,17 +109,34 @@ func serveJSON(w http.ResponseWriter, r *http.Request) {
 func loadMessages() []Message {
 	var messages []Message
 	
-	data, err := os.ReadFile(messagesFilePath)
+	data, err := redisGet(redisMessagesKey)
 	if err != nil {
-		log.Printf("No messages file found or error reading: %v", err)
+		log.Printf("Error reading from Redis: %v", err)
 		return messages
 	}
 	
-	if err := json.Unmarshal(data, &messages); err != nil {
+	if data == nil {
+		log.Printf("No messages found in Redis")
+		return messages
+	}
+	
+	var jsonStr string
+	switch v := data.(type) {
+	case string:
+		jsonStr = v
+	case []byte:
+		jsonStr = string(v)
+	default:
+		log.Printf("Unexpected data type from Redis: %T", data)
+		return messages
+	}
+	
+	if err := json.Unmarshal([]byte(jsonStr), &messages); err != nil {
 		log.Printf("Error unmarshaling messages: %v", err)
 		return messages
 	}
 	
+	log.Printf("✅ Loaded %d messages from Redis", len(messages))
 	return messages
 }
 
