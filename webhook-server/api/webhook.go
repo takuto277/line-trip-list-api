@@ -1,15 +1,14 @@
 package handler
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"sync"
 
 	"github.com/line/line-bot-sdk-go/v8/linebot"
-	"github.com/line/line-bot-sdk-go/v8/linebot/messaging_api"
 	"github.com/line/line-bot-sdk-go/v8/linebot/webhook"
 )
 
@@ -21,6 +20,12 @@ type AppMessage struct {
 	Timestamp int64  `json:"timestamp"`
 	UserName  string `json:"user_name"`
 }
+
+// 共有メモリストレージ（本番環境ではデータベースを使用すること）
+var (
+	receivedMessages []AppMessage
+	mu               sync.Mutex
+)
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -105,34 +110,25 @@ func notifyiOSApp(message AppMessage) {
 	messageJSON, _ := json.MarshalIndent(message, "", "  ")
 	log.Printf("📲 Received LINE Message:\n%s", messageJSON)
 	
-	// メッセージをAPIに保存
-	saveMessage(message)
+	// メモリ内に保存
+	saveToMemory(message)
 }
 
-func saveMessage(message AppMessage) {
-	// 同じサーバーの /api/messages エンドポイントにPOST
-	messageJSON, err := json.Marshal(message)
-	if err != nil {
-		log.Printf("Error marshaling message: %v", err)
-		return
-	}
-
-	// 環境によってベースURLを変更
-	baseURL := os.Getenv("VERCEL_URL")
-	if baseURL == "" {
-		baseURL = "https://line-trip-list.vercel.app"
-	}
+func saveToMemory(message AppMessage) {
+	mu.Lock()
+	defer mu.Unlock()
 	
-	resp, err := http.Post(baseURL+"/api/messages", "application/json", bytes.NewBuffer(messageJSON))
-	if err != nil {
-		log.Printf("Error saving message: %v", err)
-		return
-	}
-	defer resp.Body.Close()
+	receivedMessages = append(receivedMessages, message)
+	log.Printf("✅ Message saved to memory. Total messages: %d", len(receivedMessages))
+}
 
-	if resp.StatusCode == http.StatusCreated {
-		log.Printf("✅ Message saved successfully")
-	} else {
-		log.Printf("❌ Failed to save message, status: %d", resp.StatusCode)
-	}
+// GetReceivedMessages returns all received messages (used by messages.go)
+func GetReceivedMessages() []AppMessage {
+	mu.Lock()
+	defer mu.Unlock()
+	
+	// コピーを返す
+	messages := make([]AppMessage, len(receivedMessages))
+	copy(messages, receivedMessages)
+	return messages
 }

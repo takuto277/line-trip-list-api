@@ -65,6 +65,67 @@ ngrok http 8080
 2. 環境変数（`LINE_CHANNEL_SECRET`、`LINE_CHANNEL_TOKEN`）を設定
 3. LINE Developer ConsoleでWebhook URLを設定
 
+### デプロイ後の設定
+
+1. **Vercelプロジェクトの環境変数を設定**
+   - Settings → Environment Variables
+   - `LINE_CHANNEL_SECRET`: LINEのChannel Secret
+   - `LINE_CHANNEL_TOKEN`: LINEのChannel Access Token
+
+2. **LINE Developer ConsoleでWebhook URLを設定**
+   - Messaging API settings → Webhook URL
+   - URL: `https://line-trip-list-api.vercel.app/api/webhook`
+   - Webhook URLを「Use webhook」に設定
+   - 「Verify」ボタンでテスト接続を確認
+
+3. **動作確認**
+   - LINEグループにBotを追加
+   - グループでメッセージを送信
+   - `https://line-trip-list-api.vercel.app/api/messages` をブラウザで開く
+   - 受信したメッセージが表示されることを確認
+
+## 動作確認方法
+
+### メッセージ受信のテスト
+
+1. **Webhookエンドポイントの確認**
+   ```bash
+   # ヘルスチェック
+   curl https://line-trip-list-api.vercel.app/api/health
+   ```
+
+2. **LINEグループでメッセージ送信**
+   - Botを追加したLINEグループでメッセージを送信
+   - 任意のテキストメッセージでOK
+
+3. **受信メッセージの確認**
+   
+   **ブラウザで確認（見やすい表示）:**
+   ```
+   https://line-trip-list-api.vercel.app/api/messages
+   ```
+   
+   **JSONで確認（API連携用）:**
+   ```bash
+   curl -H "Accept: application/json" https://line-trip-list-api.vercel.app/api/messages
+   ```
+
+4. **Vercelログの確認**
+   - Vercelダッシュボード → プロジェクト → Logs
+   - リアルタイムでWebhookの受信状況を確認可能
+
+### トラブルシューティング
+
+**メッセージが表示されない場合:**
+1. LINE Developer ConsoleでWebhook URLが正しく設定されているか確認
+2. 環境変数（LINE_CHANNEL_SECRET、LINE_CHANNEL_TOKEN）が設定されているか確認
+3. Vercelのログでエラーが出ていないか確認
+4. Webhook URLの「Verify」ボタンでテスト接続を実行
+
+**注意事項:**
+- メッセージはメモリ内に保存されるため、Vercel関数の再起動時に消えます
+- 本番環境では、データベース（Supabase、Planetscale等）の使用を推奨します
+
 ## 取得が必要な情報
 
 ### LINE Developer Console

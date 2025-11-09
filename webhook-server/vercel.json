@@ -1,14 +1,30 @@
 {
   "version": 2,
   "functions": {
-    "api/main.go": {
+    "api/*.go": {
       "runtime": "@vercel/go"
     }
   },
   "routes": [
     {
+      "src": "/api/webhook",
+      "dest": "/api/webhook.go"
+    },
+    {
+      "src": "/api/messages",
+      "dest": "/api/messages.go"
+    },
+    {
+      "src": "/api/health",
+      "dest": "/api/health.go"
+    },
+    {
+      "src": "/api/send",
+      "dest": "/api/send.go"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/api/main"
+      "dest": "/api/index.go"
     }
   ]
 }

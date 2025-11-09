@@ -1,20 +1,58 @@
 # LINE Trip List Webhook Server
 
-Vercelデプロイ済み: https://line-trip-list.vercel.app
+Vercelデプロイ済み: https://line-trip-list-api.vercel.app
 
-## 重要な設定
+## 📋 デプロイ手順
 
-### Vercelプロジェクト設定
-1. **Root Directory**: `webhook-server` に設定
-2. **Environment Variables**:
-   - `LINE_CHANNEL_SECRET`
-   - `LINE_CHANNEL_TOKEN`
+### 1. Vercelプロジェクト設定
 
-### LINE Developer Console設定
-- **Webhook URL**: `https://line-trip-list.vercel.app/api/webhook`
-- **Use webhook**: ON
-- **Auto-reply messages**: OFF（自動返信を無効化）
-- **Greeting messages**: OFF（あいさつメッセージを無効化）
+#### Root Directory設定
+- Settings → General → Root Directory
+- 値: `webhook-server` を設定
+
+#### 環境変数設定
+Settings → Environment Variables で以下を追加:
+
+| 変数名 | 説明 | 取得方法 |
+|--------|------|----------|
+| `LINE_CHANNEL_SECRET` | LINEチャンネルのシークレット | LINE Developer Console > Basic settings |
+| `LINE_CHANNEL_TOKEN` | LINEチャンネルのアクセストークン | LINE Developer Console > Messaging API > Issue token |
+
+### 2. LINE Developer Console設定
+
+#### Webhook URL設定
+1. Messaging API settings を開く
+2. Webhook settings セクション
+   - **Webhook URL**: `https://line-trip-list-api.vercel.app/api/webhook`
+   - **Use webhook**: ON に設定
+   - **Verify** ボタンをクリックして接続確認
+
+#### 自動返信の無効化（推奨）
+1. Messaging API settings を開く
+2. LINE Official Account features セクション
+   - **Auto-reply messages**: OFF
+   - **Greeting messages**: OFF
+
+### 3. 動作確認
+
+#### ステップ1: ヘルスチェック
+```bash
+curl https://line-trip-list-api.vercel.app/api/health
+# 期待する応答: {"status":"ok"}
+```
+
+#### ステップ2: Botをグループに追加
+1. LINEアプリでグループを作成
+2. グループにBotを追加
+3. グループでメッセージを送信
+
+#### ステップ3: メッセージ確認
+ブラウザで以下にアクセス:
+```
+https://line-trip-list-api.vercel.app/api/messages
+```
+
+送信したメッセージが表示されれば成功！🎉
 
 ## エンドポイント
 
