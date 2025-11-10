@@ -95,14 +95,27 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 func serveJSON(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
-	messages := loadMessages()
-	
-	response := map[string]interface{}{
-		"messages": messages,
-		"count":    len(messages),
-		"note":     "Note: Messages are stored in /tmp and may be cleared. Use a database for production.",
-	}
+    
+    messages := loadMessages()
+
+    // クエリパラメータでフィルタ可能 (line_id)
+    lineID := r.URL.Query().Get("line_id")
+    filtered := messages
+    if lineID != "" {
+        var tmp []Message
+        for _, m := range messages {
+            if m.UserID == lineID {
+                tmp = append(tmp, m)
+            }
+        }
+        filtered = tmp
+    }
+
+    response := map[string]interface{}{
+        "messages": filtered,
+        "count":    len(filtered),
+        "note":     "Note: Messages are stored in /tmp and may be cleared. Use a database for production.",
+    }
 	json.NewEncoder(w).Encode(response)
 }
 
