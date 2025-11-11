@@ -80,31 +80,6 @@ func redisSet(key string, value string, ttlSeconds int) error {
 
 // /api/search_image?q=... -> { "imageUrl": "..." }
 func Handler(w http.ResponseWriter, r *http.Request) {
-    // Quick probe endpoint to verify handler is reachable and env vars exist.
-    if r.URL.Query().Get("_probe") == "1" {
-        cx := os.Getenv("GOOGLE_CSE_CX")
-        key := os.Getenv("GOOGLE_CSE_KEY")
-        mask := func(s string) string {
-            if s == "" {
-                return ""
-            }
-            if len(s) <= 10 {
-                return s
-            }
-            return s[:6] + "..." + s[len(s)-4:]
-        }
-
-        w.Header().Set("Content-Type", "application/json")
-        json.NewEncoder(w).Encode(map[string]interface{}{
-            "_from": "search_image_handler",
-            "GOOGLE_CSE_CX": mask(cx),
-            "GOOGLE_CSE_KEY_masked": mask(key),
-            "KV_REST_API_URL_set": os.Getenv("KV_REST_API_URL") != "",
-            "KV_REST_API_TOKEN_set": os.Getenv("KV_REST_API_TOKEN") != "",
-        })
-        return
-    }
-
     q := r.URL.Query().Get("q")
     if q == "" {
         http.Error(w, "missing q", http.StatusBadRequest)
@@ -154,19 +129,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
     defer resp.Body.Close()
 
     if resp.StatusCode != 200 {
-        // Read response body for debugging and return it plus the exact reqUrl
-        bodyBytes, _ := io.ReadAll(resp.Body)
-        var parsed interface{}
-        if err := json.Unmarshal(bodyBytes, &parsed); err != nil {
-            parsed = string(bodyBytes)
-        }
-
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusBadGateway)
-        json.NewEncoder(w).Encode(map[string]interface{}{
-            "reqUrl": reqUrl,
-            "google": parsed,
-        })
+        http.Error(w, "image search failed", http.StatusBadGateway)
         return
     }
 
