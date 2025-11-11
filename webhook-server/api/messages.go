@@ -83,10 +83,20 @@ func serveJSON(w http.ResponseWriter, r *http.Request) {
     lineID := r.URL.Query().Get("line_id")
     filtered := messages
     if lineID != "" {
-        var tmp []Message
+        // 指定 userId が参加している group_id を収集
+        groupSet := make(map[string]struct{})
         for _, m := range messages {
             if m.UserID == lineID {
-                tmp = append(tmp, m)
+                groupSet[m.GroupID] = struct{}{}
+            }
+        }
+
+        var tmp []Message
+        if len(groupSet) > 0 {
+            for _, m := range messages {
+                if _, ok := groupSet[m.GroupID]; ok {
+                    tmp = append(tmp, m)
+                }
             }
         }
         filtered = tmp
