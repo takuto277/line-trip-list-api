@@ -129,7 +129,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
     defer resp.Body.Close()
 
     if resp.StatusCode != 200 {
-        http.Error(w, "image search failed", http.StatusBadGateway)
+        // Read response body for debugging and return it to caller
+        bodyBytes, _ := io.ReadAll(resp.Body)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusBadGateway)
+        w.Write(bodyBytes)
         return
     }
 
