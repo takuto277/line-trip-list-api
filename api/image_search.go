@@ -1,13 +1,82 @@
 package handler
 
 import (
+    "bytes"
     "encoding/json"
     "fmt"
+    "io"
     "net/http"
     "net/url"
     "os"
     "time"
 )
+
+// Local helpers: Upstash Redis REST API helper (duplicate of messages.go helpers)
+// These are kept local to this handler so the Vercel build (which may compile
+// handlers independently) does not fail due to missing symbols.
+func redisGet(key string) (interface{}, error) {
+    urlStr := os.Getenv("KV_REST_API_URL")
+    token := os.Getenv("KV_REST_API_TOKEN")
+    if urlStr == "" || token == "" {
+        return nil, fmt.Errorf("redis credentials not set")
+    }
+
+    reqBody, _ := json.Marshal([]interface{}{"GET", key})
+    req, err := http.NewRequest("POST", urlStr, bytes.NewBuffer(reqBody))
+    if err != nil {
+        return nil, err
+    }
+
+    req.Header.Set("Authorization", "Bearer "+token)
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, err
+    }
+    defer resp.Body.Close()
+
+    body, _ := io.ReadAll(resp.Body)
+    var result struct{
+        Result interface{} `json:"result"`
+    }
+    json.Unmarshal(body, &result)
+    return result.Result, nil
+}
+
+func redisSet(key string, value string, ttlSeconds int) error {
+    urlStr := os.Getenv("KV_REST_API_URL")
+    token := os.Getenv("KV_REST_API_TOKEN")
+    if urlStr == "" || token == "" {
+        return fmt.Errorf("redis credentials not set")
+    }
+
+    cmd := []interface{}{"SET", key, value}
+    if ttlSeconds > 0 {
+        cmd = append(cmd, "EX", fmt.Sprintf("%d", ttlSeconds))
+    }
+    reqBody, _ := json.Marshal(cmd)
+    req, err := http.NewRequest("POST", urlStr, bytes.NewBuffer(reqBody))
+    if err != nil {
+        return err
+    }
+    req.Header.Set("Authorization", "Bearer "+token)
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+        body, _ := io.ReadAll(resp.Body)
+        return fmt.Errorf("redis set failed: %s", string(body))
+    }
+    return nil
+}
 
 // /api/search_image?q=... -> { "imageUrl": "..." }
 func Handler(w http.ResponseWriter, r *http.Request) {
