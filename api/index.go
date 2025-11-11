@@ -12,7 +12,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"status": "ok",
 		"service": "LINE Trip List Webhook Server",
-		"endpoints": []string{"/api/health", "/api/webhook", "/api/send", "/api/messages"},
+		"endpoints": []string{"/api/health", "/api/webhook", "/api/send", "/api/messages", "/api/search_image"},
 		"version": "1.0.0",
 	}
 	
