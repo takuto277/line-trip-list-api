@@ -129,11 +129,19 @@ func Handler(w http.ResponseWriter, r *http.Request) {
     defer resp.Body.Close()
 
     if resp.StatusCode != 200 {
-        // Read response body for debugging and return it to caller
+        // Read response body for debugging and return it plus the exact reqUrl
         bodyBytes, _ := io.ReadAll(resp.Body)
+        var parsed interface{}
+        if err := json.Unmarshal(bodyBytes, &parsed); err != nil {
+            parsed = string(bodyBytes)
+        }
+
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusBadGateway)
-        w.Write(bodyBytes)
+        json.NewEncoder(w).Encode(map[string]interface{}{
+            "reqUrl": reqUrl,
+            "google": parsed,
+        })
         return
     }
 
