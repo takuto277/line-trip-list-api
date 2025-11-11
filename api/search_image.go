@@ -82,11 +82,23 @@ func redisSet(key string, value string, ttlSeconds int) error {
 func Handler(w http.ResponseWriter, r *http.Request) {
     // Quick probe endpoint to verify handler is reachable and env vars exist.
     if r.URL.Query().Get("_probe") == "1" {
+        cx := os.Getenv("GOOGLE_CSE_CX")
+        key := os.Getenv("GOOGLE_CSE_KEY")
+        mask := func(s string) string {
+            if s == "" {
+                return ""
+            }
+            if len(s) <= 10 {
+                return s
+            }
+            return s[:6] + "..." + s[len(s)-4:]
+        }
+
         w.Header().Set("Content-Type", "application/json")
         json.NewEncoder(w).Encode(map[string]interface{}{
             "_from": "search_image_handler",
-            "GOOGLE_CSE_KEY_set": os.Getenv("GOOGLE_CSE_KEY") != "",
-            "GOOGLE_CSE_CX_set": os.Getenv("GOOGLE_CSE_CX") != "",
+            "GOOGLE_CSE_CX": mask(cx),
+            "GOOGLE_CSE_KEY_masked": mask(key),
             "KV_REST_API_URL_set": os.Getenv("KV_REST_API_URL") != "",
             "KV_REST_API_TOKEN_set": os.Getenv("KV_REST_API_TOKEN") != "",
         })
