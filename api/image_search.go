@@ -18,9 +18,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
     }
     // Try Redis cache first (keyed by escaped query)
     cacheKey := "image_search:" + url.QueryEscape(q)
-    // redisCommand is defined in other files of this package
-    if res, err := redisCommand([]interface{}{"GET", cacheKey}); err == nil && res != nil {
-        if s, ok := res.(string); ok && s != "" {
+    if res, err := redisGet(cacheKey); err == nil && res != nil {
+        var s string
+        switch v := res.(type) {
+        case string:
+            s = v
+        case []byte:
+            s = string(v)
+        }
+        if s != "" {
             w.Header().Set("Content-Type", "application/json")
             json.NewEncoder(w).Encode(map[string]string{"imageUrl": s})
             return
@@ -79,7 +85,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
     imageUrl := body.Items[0].Link
 
     // Cache in Redis with TTL (24h)
-    _, _ = redisCommand([]interface{}{"SET", cacheKey, imageUrl, "EX", "86400"})
+    // Use redisSet helper from messages.go
+    _ = redisSet(cacheKey, imageUrl, 86400)
 
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(map[string]string{"imageUrl": imageUrl})

@@ -60,6 +60,45 @@ func redisGet(key string) (interface{}, error) {
 	return result.Result, nil
 }
 
+// Helper to set a key in Upstash Redis with optional TTL (seconds). ttlSeconds==0 means no expiry.
+func redisSet(key string, value string, ttlSeconds int) error {
+    url := os.Getenv("KV_REST_API_URL")
+    token := os.Getenv("KV_REST_API_TOKEN")
+    if url == "" || token == "" {
+        return fmt.Errorf("redis credentials not set")
+    }
+
+    // Build command: ["SET", key, value] or with expiry: ["SET", key, value, "EX", "3600"]
+    cmd := []interface{}{"SET", key, value}
+    if ttlSeconds > 0 {
+        cmd = append(cmd, "EX", fmt.Sprintf("%d", ttlSeconds))
+    }
+
+    reqBody, _ := json.Marshal(cmd)
+    req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+    if err != nil {
+        return err
+    }
+
+    req.Header.Set("Authorization", "Bearer "+token)
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+
+    // We don't strictly need to parse the body here; just ensure the request succeeded
+    if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+        body, _ := io.ReadAll(resp.Body)
+        return fmt.Errorf("redis set failed: %s", string(body))
+    }
+
+    return nil
+}
+
 func Handler(w http.ResponseWriter, r *http.Request) {
 	// CORS設定
 	w.Header().Set("Access-Control-Allow-Origin", "*")
